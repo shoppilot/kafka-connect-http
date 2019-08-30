@@ -118,7 +118,7 @@ public class HttpApiWriter {
 
         // get response
         int status = con.getResponseCode();
-        if (status != 200) {
+        if (!isStatusSuccess(status)) {
             BufferedReader in = new BufferedReader(
                     new InputStreamReader(con.getErrorStream()));
             String inputLine;
@@ -146,6 +146,12 @@ public class HttpApiWriter {
         }
         in.close();
         con.disconnect();
+    }
+
+    private boolean isStatusSuccess(int statusCode){
+        return statusCode == HttpURLConnection.HTTP_ACCEPTED || 
+               statusCode == HttpURLConnection.HTTP_OK || 
+               statusCode == HttpURLConnection.HTTP_CREATED; 
     }
 
     private String buildRecord(SinkRecord record) {

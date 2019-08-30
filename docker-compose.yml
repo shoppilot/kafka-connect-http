@@ -1,0 +1,28 @@
+version: "3"
+
+networks:
+  aplaut:
+    external:
+      name: aplaut_default
+
+volumes:
+  worker_data: ~
+
+services:
+  worker:
+    image: confluentinc/cp-kafka-connect:5.2.1
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./target:/usr/share/kafka-plugins/http-sink
+      - ./config:/config
+      - ./config/log4j.properties:/etc/kafka/connect-log4j.properties
+      - worker_data:/tmp/kafka-connect
+    environment:
+      # https://www.ibm.com/developerworks/ru/library/os-eclipse-javadebug/index.html
+      KAFKA_JMX_OPTS: "-Xdebug -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
+      CONNECT_PLUGIN_PATH: "/usr/share/kafka-plugins"
+    command: connect-standalone /config/worker.properties /config/connector.properties
+    networks:
+      - aplaut
+    hostname: test
