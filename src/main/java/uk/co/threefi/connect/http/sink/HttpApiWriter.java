@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
@@ -36,7 +37,6 @@ public class HttpApiWriter {
 
     HttpApiWriter(final HttpSinkConfig config) {
         this.config = config;
-
     }
 
     public void write(final Collection<SinkRecord> records) throws IOException {
@@ -117,41 +117,80 @@ public class HttpApiWriter {
                 + ", url:" + formattedUrl);
 
         // get response
-        int status = con.getResponseCode();
-        if (!isStatusSuccess(status)) {
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(con.getErrorStream()));
-            String inputLine;
-            StringBuffer error = new StringBuffer();
-            while ((inputLine = in.readLine()) != null) {
-                error.append(inputLine);
-            }
-            in.close();
-            throw new IOException("HTTP Response code: " + status
-                    + ", " + con.getResponseMessage() + ", " + error
+        int statusCode = con.getResponseCode();
+        String statusMessage = con.getResponseMessage();
+        String responseBody = readResponseBody(con);
+
+        con.disconnect(); // NOTE: Should we?
+
+        log.debug(", response code: " + statusCode
+                + ", " + statusMessage
+                + ", headers: " + config.headers);
+
+        if (!isRequestSuccessful(statusCode)) {
+            throw new IOException("HTTP Response code: " + statusCode
+                    + ", " + statusMessage + ", " + responseBody
                     + ", Submitted payload: " + builder.toString()
                     + ", url:" + formattedUrl);
         }
-        log.debug(", response code: " + status
-                + ", " + con.getResponseMessage()
-                + ", headers: " + config.headers);
 
-        // write the response to the log
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(con.getInputStream()));
-        String inputLine;
-        StringBuffer content = new StringBuffer();
-        while ((inputLine = in.readLine()) != null) {
-            content.append(inputLine);
-        }
-        in.close();
-        con.disconnect();
+        // if (!isStatusSuccess(status)) {
+        //     // TODO: It's not really error — just an unacceptable status, so there is no error stream
+        //     // BufferedReader in = new BufferedReader(
+        //     //         new InputStreamReader(con.getErrorStream()));
+        //     // String inputLine;
+        //     // StringBuffer error = new StringBuffer();
+        //     // while ((inputLine = in.readLine()) != null) {
+        //     //     error.append(inputLine);
+        //     // }
+        //     // in.close();
+
+        //     String error = ""; // TODO
+
+        //     throw new IOException("HTTP Response code: " + status
+        //             + ", " + con.getResponseMessage() + ", " + error
+        //             + ", Submitted payload: " + builder.toString()
+        //             + ", url:" + formattedUrl);
+        // }
+        // log.debug(", response code: " + status
+        //         + ", " + con.getResponseMessage()
+        //         + ", headers: " + config.headers);
+
+        // // write the response to the log
+        // BufferedReader in = new BufferedReader(
+        //         new InputStreamReader(con.getInputStream()));
+        // String inputLine;
+        // StringBuffer content = new StringBuffer();
+        // while ((inputLine = in.readLine()) != null) {
+        //     content.append(inputLine);
+        // }
+        // in.close();
     }
 
-    private boolean isStatusSuccess(int statusCode){
-        return statusCode == HttpURLConnection.HTTP_ACCEPTED || 
-               statusCode == HttpURLConnection.HTTP_OK || 
-               statusCode == HttpURLConnection.HTTP_CREATED; 
+    private String readResponseBody(HttpURLConnection con) throws IOException {
+        InputStream inputStream;
+        int statusCode = con.getResponseCode();
+
+        if (statusCode >= 200 && statusCode <= 299) {
+            inputStream = con.getInputStream();
+        } else {
+            inputStream = con.getErrorStream();
+        }
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+
+        StringBuffer body = new StringBuffer();
+        String inputLine;
+
+        while ((inputLine = reader.readLine()) != null) {
+            body.append(inputLine);
+        }
+
+        return body.toString();
+    }
+
+    private boolean isRequestSuccessful(int statusCode) {
+        return config.getAcceptableResponseStatusCodes().contains(statusCode);
     }
 
     private String buildRecord(SinkRecord record) {

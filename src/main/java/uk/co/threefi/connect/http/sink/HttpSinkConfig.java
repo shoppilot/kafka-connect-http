@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 import org.apache.kafka.common.config.AbstractConfig;
@@ -48,6 +49,10 @@ public class HttpSinkConfig extends AbstractConfig {
             + "separator is |, use header.separator to modify this.";
     private static final String HEADERS_DISPLAY = "headers";
     private static final String HEADERS_DEFAULT = "";
+
+    public static final String RESPONSE_ACCEPTABLE_STATUS_CODES = "response.acceptable_status_codes";
+    private static final String RESPONSE_ACCEPTABLE_STATUS_CODES_DOC = "acceptable status codes";
+    private static final String RESPONSE_ACCEPTABLE_STATUS_CODES_DEFAULT = "200,201,202";
 
     public static final String HEADER_SEPERATOR = "header.separator";
     private static final String HEADER_SEPERATOR_DOC = "separator character used in "
@@ -283,6 +288,13 @@ public class HttpSinkConfig extends AbstractConfig {
                     4,
                     ConfigDef.Width.SHORT,
                     BATCH_SEPARATOR_DISPLAY
+            )
+            .define(
+                RESPONSE_ACCEPTABLE_STATUS_CODES,
+                ConfigDef.Type.LIST,
+                RESPONSE_ACCEPTABLE_STATUS_CODES_DEFAULT,
+                ConfigDef.Importance.HIGH,
+                RESPONSE_ACCEPTABLE_STATUS_CODES_DOC
             );
 
     public final String httpApiUrl;
@@ -317,6 +329,11 @@ public class HttpSinkConfig extends AbstractConfig {
         batchPrefix = getString(BATCH_PREFIX);
         batchSuffix = getString(BATCH_SUFFIX);
         batchSeparator = getString(BATCH_SEPARATOR);
+    }
+
+    public List<Integer> getAcceptableResponseStatusCodes() {
+        List<String> statusCodes = getList((RESPONSE_ACCEPTABLE_STATUS_CODES));
+        return statusCodes.stream().map(Integer::parseInt).collect(Collectors.toList());
     }
 
 
